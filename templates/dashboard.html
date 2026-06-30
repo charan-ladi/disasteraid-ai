@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DisasterAid AI - Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="brand">🌍 DisasterAid&nbsp;AI</div>
+  <div class="nav-links">
+    <a href="/" data-i18n="nav.home">Home</a>
+    <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
+  </div>
+  <div class="lang-switcher">
+    <select id="langSelect">
+      <option value="en">English</option>
+      <option value="hi">हिन्दी</option>
+      <option value="ta">தமிழ்</option>
+      <option value="te">తెలుగు</option>
+    </select>
+  </div>
+</nav>
+
+<main class="container">
+  <div class="dash-header">
+    <h1 data-i18n="dash.heading">Rescue Dashboard</h1>
+    <div class="export-buttons">
+      <a class="btn" href="/api/export/json" data-i18n="dash.exportJson">Export JSON</a>
+      <a class="btn" href="/api/export/csv" data-i18n="dash.exportCsv">Export CSV</a>
+    </div>
+  </div>
+
+  <table id="incidentTable" class="incident-table">
+    <thead>
+      <tr>
+        <th data-i18n="table.id">ID</th>
+        <th data-i18n="table.type">Type</th>
+        <th data-i18n="table.severity">Severity</th>
+        <th data-i18n="table.trapped">Trapped</th>
+        <th data-i18n="table.location">Location</th>
+        <th data-i18n="table.priority">Priority</th>
+        <th data-i18n="table.status">Status</th>
+        <th data-i18n="table.actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="incidentBody"></tbody>
+  </table>
+</main>
+
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

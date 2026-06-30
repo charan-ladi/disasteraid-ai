@@ -1,0 +1,22 @@
+# --- Core (required, no internet/model download needed) ---
+Flask==3.1.3
+Werkzeug>=3.0
+Pillow>=10.0
+numpy>=1.24
+
+# --- Optional: enables real PDF text extraction (falls back to mock without it) ---
+pypdf>=4.0
+
+# --- Optional: enables real offline OCR (falls back to mock without it) ---
+# paddlepaddle>=2.6
+# paddleocr>=2.7
+
+# --- Optional: enables real offline speech-to-text (falls back to mock without it) ---
+# faster-whisper>=1.0
+
+# --- Optional: enables real video frame extraction (falls back to mock without it) ---
+# opencv-python>=4.9
+# (also requires ffmpeg installed on PATH for audio-track extraction)
+
+# --- Optional: enables local LLM extraction via Ollama (falls back to rule-based without it) ---
+# requests>=2.31
