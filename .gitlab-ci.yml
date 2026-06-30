@@ -12,9 +12,10 @@ variables:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 before_script:
-  - python --version
-  - pip install --upgrade pip
-  - pip install -r requirements.txt
+before_script:
+  - py --version
+  - py -m pip install --upgrade pip
+  - py -m pip install -r requirements.txt
   - pip install black ruff mypy bandit pytest pytest-cov detect-secrets semgrep
 
 # -------------------------
@@ -85,12 +86,12 @@ coverage_check:
 schema_validation:
   stage: validation
   script:
-    - python scripts/validate_schema.py
+    - py scripts/validate_schema.py
 
 offline_validation:
   stage: validation
   script:
-    - python scripts/check_offline.py
+    - py scripts/check_offline.py
 
 # -------------------------
 # BUILD
@@ -99,4 +100,4 @@ offline_validation:
 build_validation:
   stage: build
   script:
-    - python -m compileall .
+    - py -m compileall .
