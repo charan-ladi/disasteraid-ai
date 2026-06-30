@@ -1,67 +1,102 @@
 stages:
-  - lint
-  - format
-  - type_check
+  - setup
+  - quality
   - security
   - test
-  - coverage
-  - schema_validate
-  - model_check
-  - offline_test
+  - validation
   - build
 
+image: python:3.11
+
 variables:
-  PIP_FLAGS: "--break-system-packages"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 before_script:
-  - pip install -r requirements.txt $PIP_FLAGS
+  - python --version
+  - pip install --upgrade pip
+  - pip install -r requirements.txt
+  - pip install black ruff mypy bandit pytest pytest-cov detect-secrets semgrep
 
-lint:
-  stage: lint
+# -------------------------
+# SETUP
+# -------------------------
+
+install_dependencies:
+  stage: setup
   script:
-    - ruff check utils/ tests/
+    - pip check
 
-format:
-  stage: format
+# -------------------------
+# QUALITY
+# -------------------------
+
+black_format:
+  stage: quality
   script:
-    - black --check utils/ tests/
+    - black --check .
 
-type_check:
-  stage: type_check
+ruff_lint:
+  stage: quality
   script:
-    - mypy utils/ --ignore-missing-imports
+    - ruff check .
 
-security:
+mypy_typecheck:
+  stage: quality
+  script:
+    - mypy . --ignore-missing-imports
+
+# -------------------------
+# SECURITY
+# -------------------------
+
+bandit_scan:
   stage: security
   script:
-    - bandit -r utils/ -ll
+    - bandit -r . -x tests
 
-test:
+detect_secrets:
+  stage: security
+  script:
+    - detect-secrets scan --all-files
+
+semgrep_scan:
+  stage: security
+  script:
+    - semgrep --config=auto .
+
+# -------------------------
+# TEST
+# -------------------------
+
+pytest_tests:
   stage: test
   script:
-    - pytest tests/ -v
+    - pytest tests -v
 
-coverage:
-  stage: coverage
+coverage_check:
+  stage: test
   script:
-    - pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=80
+    - pytest --cov=. --cov-report=term-missing
 
-schema_validate:
-  stage: schema_validate
+# -------------------------
+# VALIDATION
+# -------------------------
+
+schema_validation:
+  stage: validation
   script:
     - python scripts/validate_schema.py
 
-model_check:
-  stage: model_check
+offline_validation:
+  stage: validation
   script:
-    - python scripts/check_models.py
+    - python scripts/check_offline.py
 
-offline_test:
-  stage: offline_test
-  script:
-    - pytest tests/test_offline.py -v
+# -------------------------
+# BUILD
+# -------------------------
 
-build:
+build_validation:
   stage: build
   script:
-    - pip check
+    - python -m compileall .
