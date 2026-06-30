@@ -1,0 +1,67 @@
+stages:
+  - lint
+  - format
+  - type_check
+  - security
+  - test
+  - coverage
+  - schema_validate
+  - model_check
+  - offline_test
+  - build
+
+variables:
+  PIP_FLAGS: "--break-system-packages"
+
+before_script:
+  - pip install -r requirements.txt $PIP_FLAGS
+
+lint:
+  stage: lint
+  script:
+    - ruff check utils/ tests/
+
+format:
+  stage: format
+  script:
+    - black --check utils/ tests/
+
+type_check:
+  stage: type_check
+  script:
+    - mypy utils/ --ignore-missing-imports
+
+security:
+  stage: security
+  script:
+    - bandit -r utils/ -ll
+
+test:
+  stage: test
+  script:
+    - pytest tests/ -v
+
+coverage:
+  stage: coverage
+  script:
+    - pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=80
+
+schema_validate:
+  stage: schema_validate
+  script:
+    - python scripts/validate_schema.py
+
+model_check:
+  stage: model_check
+  script:
+    - python scripts/check_models.py
+
+offline_test:
+  stage: offline_test
+  script:
+    - pytest tests/test_offline.py -v
+
+build:
+  stage: build
+  script:
+    - pip check
