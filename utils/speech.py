@@ -1,54 +1,74 @@
 """
-utils/speech.py
-Offline audio transcription using OpenAI Whisper (tiny model, CPU).
+speech.py
+---------
+Converts voice/audio disaster reports into text using offline speech
+recognition.
+
+REAL ENGINE: faster-whisper (CTranslate2-based, CPU-only, fully offline
+once the model is downloaded once).
+    pip install faster-whisper
+
+MOCK MODE: If faster-whisper isn't installed, falls back to a deterministic
+mock transcript so the pipeline keeps working end-to-end.
 """
 
 import os
 
-import whisper
-from pydub import AudioSegment
+_whisper_model = None
+_WHISPER_AVAILABLE = False
 
-_model = None
+try:
+    from faster_whisper import WhisperModel  # noqa: F401
+    _WHISPER_AVAILABLE = True
+except Exception:
+    _WHISPER_AVAILABLE = False
+
+WHISPER_MODEL_SIZE = "base"  # tiny / base / small - base is a good CPU tradeoff
 
 
 def _get_model():
-    """Lazily load the Whisper tiny model (CPU) once."""
-    global _model
-    if _model is None:
-        _model = whisper.load_model("tiny")
-    return _model
+    global _whisper_model
+    if _whisper_model is None and _WHISPER_AVAILABLE:
+        from faster_whisper import WhisperModel
+        _whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+    return _whisper_model
 
 
-def _convert_to_wav(input_path: str) -> str:
-    """Convert any supported audio format to 16kHz mono WAV."""
-    audio = AudioSegment.from_file(input_path)
-    audio = audio.set_frame_rate(16000).set_channels(1)
-    output_path = os.path.splitext(input_path)[0] + "_converted.wav"
-    audio.export(output_path, format="wav")
-    return output_path
+_MOCK_TRANSCRIPTS = [
+    "There is heavy flooding near the market area. Around six families are stuck "
+    "on rooftops and need a boat immediately.",
+    "We have a fire in building number twelve. Smoke is spreading and two people "
+    "are injured. Please send fire brigade and ambulance.",
+    "Landslide blocked the main road near the hill village. No injuries reported "
+    "but the village is cut off and needs food and water supplies.",
+]
 
 
-def transcribe_audio(file_path: str) -> str:
+def _mock_transcribe(audio_path):
+    seed = abs(hash(os.path.basename(audio_path))) % len(_MOCK_TRANSCRIPTS)
+    return _MOCK_TRANSCRIPTS[seed]
+
+
+def transcribe_audio(audio_path):
     """
-    Convert the input audio to 16kHz mono WAV and run local Whisper
-    transcription. Returns the raw transcript string.
+    Returns transcribed text from an audio file.
+    Uses real faster-whisper if installed; otherwise returns a mock transcript.
     """
-    try:
-        wav_path = _convert_to_wav(file_path)
-    except Exception as e:
-        raise ValueError(f"Could not process audio file: {e}") from e
+    if not os.path.exists(audio_path):
+        raise FileNotFoundError(audio_path)
 
-    try:
-        model = _get_model()
-        result = model.transcribe(wav_path, fp16=False)
-        return result.get("text", "").strip()
-    finally:
-        if os.path.exists(wav_path) and wav_path != file_path:
-            os.remove(wav_path)
+    model = _get_model()
+    if model is not None:
+        try:
+            segments, _info = model.transcribe(audio_path, beam_size=5)
+            text = " ".join(seg.text.strip() for seg in segments).strip()
+            if text:
+                return {"text": text, "engine": "faster-whisper", "mock": False}
+        except Exception:
+            pass  # fall through to mock
+
+    return {"text": _mock_transcribe(audio_path), "engine": "mock", "mock": True}
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1:
-        print(transcribe_audio(sys.argv[1]))
+    print(transcribe_audio("sample.wav"))

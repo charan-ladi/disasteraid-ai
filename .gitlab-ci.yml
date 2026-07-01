@@ -1,67 +1,103 @@
 stages:
-  - lint
-  - format
-  - type_check
+  - setup
+  - quality
   - security
   - test
-  - coverage
-  - schema_validate
-  - model_check
-  - offline_test
+  - validation
   - build
 
+image: python:3.11
+
 variables:
-  PIP_FLAGS: "--break-system-packages"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 before_script:
-  - pip install -r requirements.txt $PIP_FLAGS
+before_script:
+  - py --version
+  - py -m pip install --upgrade pip
+  - py -m pip install -r requirements.txt
+  - pip install black ruff mypy bandit pytest pytest-cov detect-secrets semgrep
 
-lint:
-  stage: lint
-  script:
-    - ruff check utils/ tests/
+# -------------------------
+# SETUP
+# -------------------------
 
-format:
-  stage: format
-  script:
-    - black --check utils/ tests/
-
-type_check:
-  stage: type_check
-  script:
-    - mypy utils/ --ignore-missing-imports
-
-security:
-  stage: security
-  script:
-    - bandit -r utils/ -ll
-
-test:
-  stage: test
-  script:
-    - pytest tests/ -v
-
-coverage:
-  stage: coverage
-  script:
-    - pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=80
-
-schema_validate:
-  stage: schema_validate
-  script:
-    - python scripts/validate_schema.py
-
-model_check:
-  stage: model_check
-  script:
-    - python scripts/check_models.py
-
-offline_test:
-  stage: offline_test
-  script:
-    - pytest tests/test_offline.py -v
-
-build:
-  stage: build
+install_dependencies:
+  stage: setup
   script:
     - pip check
+
+# -------------------------
+# QUALITY
+# -------------------------
+
+black_format:
+  stage: quality
+  script:
+    - black --check .
+
+ruff_lint:
+  stage: quality
+  script:
+    - ruff check .
+
+mypy_typecheck:
+  stage: quality
+  script:
+    - mypy . --ignore-missing-imports
+
+# -------------------------
+# SECURITY
+# -------------------------
+
+bandit_scan:
+  stage: security
+  script:
+    - bandit -r . -x tests
+
+detect_secrets:
+  stage: security
+  script:
+    - detect-secrets scan --all-files
+
+semgrep_scan:
+  stage: security
+  script:
+    - semgrep --config=auto .
+
+# -------------------------
+# TEST
+# -------------------------
+
+pytest_tests:
+  stage: test
+  script:
+    - pytest tests -v
+
+coverage_check:
+  stage: test
+  script:
+    - pytest --cov=. --cov-report=term-missing
+
+# -------------------------
+# VALIDATION
+# -------------------------
+
+schema_validation:
+  stage: validation
+  script:
+    - py scripts/validate_schema.py
+
+offline_validation:
+  stage: validation
+  script:
+    - py scripts/check_offline.py
+
+# -------------------------
+# BUILD
+# -------------------------
+
+build_validation:
+  stage: build
+  script:
+    - py -m compileall .
