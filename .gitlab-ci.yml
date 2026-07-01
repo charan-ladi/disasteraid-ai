@@ -11,54 +11,54 @@ stages:
   - build
 
 before_script:
-  - python -m pip install -r requirements.txt --break-system-packages --quiet
+  - python3 -m pip install -r requirements.txt --break-system-packages --quiet
 
 lint:
   stage: lint
   script:
-    - python -m ruff check utils/ tests/
+    - python3 -m ruff check utils/ tests/
 
 format:
   stage: format
   script:
-    - python -m black --check utils/ tests/
+    - python3 -m black --check utils/ tests/
 
 type_check:
   stage: type_check
   script:
-    - python -m mypy utils/ --ignore-missing-imports
+    - python3 -m mypy utils/ --ignore-missing-imports
 
 security:
   stage: security
   script:
-    - python -m bandit -r utils/ -ll
+    - python3 -m bandit -r utils/ -ll
 
 test:
   stage: test
   script:
-    - python -m pytest tests/ -v
+    - python3 -m pytest tests/ -v
 
 coverage:
   stage: coverage
   script:
-    - python -m pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=80
+    - python3 -m pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=80
 
 schema_validate:
   stage: schema_validate
   script:
-    - python scripts/validate_schema.py
+    - python3 scripts/validate_schema.py
 
 model_check:
   stage: model_check
   script:
-    - python scripts/check_models.py
+    - python3 scripts/check_models.py
 
 offline_test:
   stage: offline_test
   script:
-    - python -m pytest tests/test_offline.py -v
+    - python3 -m pytest tests/test_offline.py -v
 
 build:
   stage: build
   script:
-    - python -m pip check
+    - python3 -m pip check
