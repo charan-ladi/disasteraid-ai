@@ -121,7 +121,7 @@ elif page == "📊 Dashboard":
                     f"""
                     <div style="border-left: 6px solid {color}; padding: 10px;
                                 margin-bottom: 10px; background-color: #f9f9f9;
-                                border-radius: 4px;">
+                                border-radius: 4px; color: #111111;">
                         <b>#{incident['id']} — {incident.get('disaster_type', 'Unknown')}</b><br>
                         Severity: <b>{incident.get('severity', 'N/A')}</b><br>
                         Location: {incident.get('location', 'N/A')}<br>
