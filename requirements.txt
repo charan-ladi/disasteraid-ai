@@ -21,3 +21,4 @@ pypdf>=4.0
 # --- Optional: enables local LLM extraction via Ollama (falls back to rule-based without it) ---
 # requests>=2.31
 streamlit>=1.35.0
+streamlit>=1.35.0
