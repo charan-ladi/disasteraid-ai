@@ -116,6 +116,7 @@ def _extract_pdf_text(pdf_path):
     """Lightweight offline PDF text extraction using pypdf, with mock fallback."""
     try:
         from pypdf import PdfReader
+
         reader = PdfReader(pdf_path)
         text = "\n".join((page.extract_text() or "") for page in reader.pages)
         if text.strip():
@@ -124,8 +125,8 @@ def _extract_pdf_text(pdf_path):
         pass
     return {
         "text": "Government relief notice: Camp established for flood-affected "
-                "families. Approximately 80 people sheltered, food and clean "
-                "water urgently required.",
+        "families. Approximately 80 people sheltered, food and clean "
+        "water urgently required.",
         "engine": "mock",
         "mock": True,
     }
@@ -166,4 +167,5 @@ def export(fmt):
 
 if __name__ == "__main__":
     db.init_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
