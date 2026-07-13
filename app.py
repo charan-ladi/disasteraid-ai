@@ -1,115 +1,114 @@
-"""
-app.py
-------
-DisasterAid AI - Flask backend.
-
-Frontend is plain HTML/CSS/JS (templates/ + static/) - NOT Streamlit.
-All processing is local: text, image (OCR), audio (speech-to-text), and
-video are converted into structured emergency JSON via utils/parser.py,
-then stored in SQLite (utils/db.py) and shown on the dashboard.
-"""
-
+import streamlit as st
 import os
-from flask import Flask, request, jsonify, render_template, send_file
-from werkzeug.utils import secure_filename
-
+import json
+import pandas as pd
+import tempfile
 from utils import db, parser, ocr, speech, video
 
-BASE_DIR = os.path.dirname(__file__)
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-EXPORT_DIR = os.path.join(BASE_DIR, "exports")
+# Initialize database
+db.init_db()
 
-ALLOWED_EXT = {
-    "text": {"txt"},
-    "image": {"png", "jpg", "jpeg", "bmp", "webp"},
-    "audio": {"wav", "mp3", "m4a", "ogg", "flac"},
-    "video": {"mp4", "mov", "avi", "mkv"},
-    "document": {"pdf"},
-}
+# Page configuration
+st.set_page_config(
+    page_title="DisasterAid AI",
+    page_icon="🌍",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200MB
+# Custom CSS for high-quality dark-themed layout
+st.markdown(
+    """
+<style>
+    .main-title {
+        font-size: 2.8rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #ff4b4b, #ff7676);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.1rem;
+    }
+    .sub-title {
+        font-size: 1.15rem;
+        color: #aaaaaa;
+        margin-bottom: 2rem;
+    }
+    .card-style {
+        border-radius: 12px;
+        padding: 20px;
+        background-color: #1e1e1e;
+        border: 1px solid #333333;
+        margin-bottom: 20px;
+    }
+    .banner-style {
+        padding: 10px 15px;
+        background-color: #3b2222;
+        color: #ff8888;
+        border-left: 5px solid #ff4b4b;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+# Languages configuration
+LANGUAGES = {"en": "English", "hi": "हिन्दी", "ta": "தமிழ்", "te": "తెలుగు"}
 
 
-def _ext(filename):
-    return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
-
-def _detect_category(filename):
-    e = _ext(filename)
-    for category, exts in ALLOWED_EXT.items():
-        if e in exts:
-            return category
-    return None
-
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/dashboard")
-def dashboard():
-    return render_template("dashboard.html")
-
-
-@app.route("/api/process/text", methods=["POST"])
-def process_text():
-    payload = request.get_json(silent=True) or {}
-    text = payload.get("text", "")
-    if not text.strip():
-        return jsonify({"error": "No text provided"}), 400
-
-    record = parser.parse_text(text)
-    incident_id = db.save_incident(record, source_type="text", raw_text=text)
-    record["incident_id"] = incident_id
-    return jsonify(record)
-
-
-@app.route("/api/process/file", methods=["POST"])
-def process_file():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    f = request.files["file"]
-    if f.filename == "":
-        return jsonify({"error": "Empty filename"}), 400
-
-    category = _detect_category(f.filename)
-    if category is None:
-        return jsonify({"error": "Unsupported file type"}), 400
-
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    filename = secure_filename(f.filename)
-    save_path = os.path.join(UPLOAD_DIR, filename)
-    f.save(save_path)
-
+def load_translations(lang):
+    path = os.path.join("static", "i18n", f"{lang}.json")
     try:
-        if category == "image":
-            result = ocr.extract_text_from_image(save_path)
-        elif category == "audio":
-            result = speech.transcribe_audio(save_path)
-        elif category == "video":
-            result = video.process_video(save_path)
-        elif category == "document":
-            result = _extract_pdf_text(save_path)
-        else:
-            result = {"text": "", "engine": "none", "mock": False}
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        # Fallback to defaults
+        return {
+            "nav.home": "Home",
+            "nav.dashboard": "Dashboard",
+            "title": "Offline Disaster Intelligence",
+            "subtitle": "Upload an image, video, audio recording, PDF, or type a report. Everything is processed locally.",
+            "text.heading": "Text Report",
+            "text.placeholder": "Describe the situation...",
+            "text.button": "Analyze Text",
+            "file.heading": "Image / Audio / Video / PDF",
+            "file.button": "Analyze File",
+            "result.heading": "Structured Result",
+            "result.mockBanner": "Demo mode: install OCR/Whisper locally for live model output (see README).",
+            "loading": "Processing locally...",
+            "dash.heading": "Rescue Dashboard",
+            "dash.exportJson": "Export JSON",
+            "dash.exportCsv": "Export CSV",
+            "table.id": "ID",
+            "table.type": "Type",
+            "table.severity": "Severity",
+            "table.trapped": "Trapped",
+            "table.location": "Location",
+            "table.priority": "Priority",
+            "table.status": "Status",
+            "table.actions": "Actions",
+        }
 
-        extracted_text = result["text"]
-        record = parser.parse_text(extracted_text)
-        record["extraction_engine"] = result["engine"]
-        record["mock_mode"] = result["mock"]
-        record["extracted_text"] = extracted_text
 
-        incident_id = db.save_incident(
-            record, source_type=category, source_file=filename, raw_text=extracted_text
-        )
-        record["incident_id"] = incident_id
-        return jsonify(record)
+# Sidebar - Language and Navigation
+st.sidebar.markdown("### 🌍 Language / भाषा")
+lang_code = st.sidebar.selectbox(
+    "Select Language",
+    options=list(LANGUAGES.keys()),
+    format_func=lambda x: LANGUAGES[x],
+    label_visibility="collapsed",
+)
+t = load_translations(lang_code)
 
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🧭 Navigation")
+nav_choice = st.sidebar.radio(
+    "Go to",
+    [t.get("nav.home", "Home"), t.get("nav.dashboard", "Dashboard")],
+    label_visibility="collapsed",
+)
 
 
 def _extract_pdf_text(pdf_path):
@@ -132,40 +131,242 @@ def _extract_pdf_text(pdf_path):
     }
 
 
-@app.route("/api/incidents", methods=["GET"])
-def list_incidents():
-    return jsonify(db.get_all_incidents())
+if nav_choice == t.get("nav.home", "Home"):
+    # Main Header
+    st.markdown(
+        f'<div class="main-title">{t.get("title")}</div>', unsafe_allow_html=True
+    )
+    st.markdown(
+        f'<div class="sub-title">{t.get("subtitle")}</div>', unsafe_allow_html=True
+    )
 
+    col1, col2 = st.columns(2)
 
-@app.route("/api/incidents/<int:incident_id>", methods=["GET"])
-def get_incident(incident_id):
-    record = db.get_incident(incident_id)
-    if record is None:
-        return jsonify({"error": "Not found"}), 404
-    return jsonify(record)
+    with col1:
+        st.markdown(f'### 📝 {t.get("text.heading")}')
+        text_input = st.text_area(
+            "Report Description",
+            placeholder=t.get("text.placeholder"),
+            height=200,
+            label_visibility="collapsed",
+        )
+        submit_text = st.button(
+            t.get("text.button"), type="primary", use_container_width=True
+        )
 
+        if submit_text:
+            if not text_input.strip():
+                st.error("Please enter some text description.")
+            else:
+                with st.spinner(t.get("loading")):
+                    # Parse and save
+                    record = parser.parse_text(text_input)
+                    record["extraction_engine"] = "raw_text"
+                    record["mock_mode"] = False
+                    record["extracted_text"] = text_input
 
-@app.route("/api/incidents/<int:incident_id>", methods=["DELETE"])
-def delete_incident(incident_id):
-    db.delete_incident(incident_id)
-    return jsonify({"deleted": incident_id})
+                    incident_id = db.save_incident(
+                        record, source_type="text", raw_text=text_input
+                    )
+                    record["incident_id"] = incident_id
 
+                    st.success("Successfully analyzed and saved text report!")
+                    st.markdown(f'### 📊 {t.get("result.heading")}')
+                    st.json(record)
 
-@app.route("/api/export/<fmt>", methods=["GET"])
-def export(fmt):
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-    if fmt == "json":
-        path = os.path.join(EXPORT_DIR, "incidents_export.json")
-        db.export_json(path)
-    elif fmt == "csv":
-        path = os.path.join(EXPORT_DIR, "incidents_export.csv")
-        db.export_csv(path)
+    with col2:
+        st.markdown(f'### 📁 {t.get("file.heading")}')
+        uploaded_file = st.file_uploader(
+            "Upload file",
+            type=[
+                "png",
+                "jpg",
+                "jpeg",
+                "bmp",
+                "webp",
+                "wav",
+                "mp3",
+                "m4a",
+                "ogg",
+                "flac",
+                "mp4",
+                "mov",
+                "avi",
+                "mkv",
+                "pdf",
+            ],
+            label_visibility="collapsed",
+        )
+        submit_file = st.button(
+            t.get("file.button"), type="primary", use_container_width=True
+        )
+
+        if submit_file:
+            if uploaded_file is None:
+                st.error("Please select a file to upload first.")
+            else:
+                with st.spinner(t.get("loading")):
+                    # Save uploaded file to a temporary location
+                    suffix = os.path.splitext(uploaded_file.name)[1]
+                    with tempfile.NamedTemporaryFile(
+                        suffix=suffix, delete=False
+                    ) as temp_f:
+                        temp_f.write(uploaded_file.read())
+                        temp_path = temp_f.name
+
+                    # Detect category based on suffix
+                    ext = suffix.lower().strip(".")
+                    category = "none"
+                    if ext in ["png", "jpg", "jpeg", "bmp", "webp"]:
+                        category = "image"
+                    elif ext in ["wav", "mp3", "m4a", "ogg", "flac"]:
+                        category = "audio"
+                    elif ext in ["mp4", "mov", "avi", "mkv"]:
+                        category = "video"
+                    elif ext == "pdf":
+                        category = "document"
+
+                    try:
+                        if category == "image":
+                            res = ocr.extract_text_from_image(temp_path)
+                        elif category == "audio":
+                            res = speech.transcribe_audio(temp_path)
+                        elif category == "video":
+                            res = video.process_video(temp_path)
+                        elif category == "document":
+                            res = _extract_pdf_text(temp_path)
+                        else:
+                            res = {"text": "", "engine": "none", "mock": False}
+
+                        extracted_text = res["text"]
+                        record = parser.parse_text(extracted_text)
+                        record["extraction_engine"] = res["engine"]
+                        record["mock_mode"] = res["mock"]
+                        record["extracted_text"] = extracted_text
+
+                        incident_id = db.save_incident(
+                            record,
+                            source_type=category,
+                            source_file=uploaded_file.name,
+                            raw_text=extracted_text,
+                        )
+                        record["incident_id"] = incident_id
+
+                        st.success(f"Successfully processed {category} file!")
+
+                        if res["mock"]:
+                            st.markdown(
+                                f'<div class="banner-style">⚠️ {t.get("result.mockBanner")}</div>',
+                                unsafe_allow_html=True,
+                            )
+
+                        st.markdown(f'### 📊 {t.get("result.heading")}')
+                        st.json(record)
+
+                    except Exception as e:
+                        st.error(f"Error processing file: {e}")
+                    finally:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+
+else:
+    # Dashboard View
+    st.markdown(
+        f'<div class="main-title">{t.get("dash.heading", "Rescue Dashboard")}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
+
+    incidents = db.get_all_incidents()
+
+    if not incidents:
+        st.info(
+            "No incident reports found in the database. Go back to Home to submit a report."
+        )
     else:
-        return jsonify({"error": "format must be json or csv"}), 400
-    return send_file(path, as_attachment=True)
+        # Metrics Row
+        total_reports = len(incidents)
+        total_trapped = sum(r.get("people_trapped", 0) for r in incidents)
+        critical_count = sum(1 for r in incidents if r.get("severity") == "Critical")
 
+        m_col1, m_col2, m_col3 = st.columns(3)
+        m_col1.metric("🚨 Total Incidents", total_reports)
+        m_col2.metric("👥 Total People Trapped", total_trapped)
+        m_col3.metric("🔴 Critical Cases", critical_count)
 
-if __name__ == "__main__":
-    db.init_db()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+        st.markdown("### 📋 Incident Records")
+
+        # Format list to Pandas DataFrame
+        df = pd.DataFrame(incidents)
+
+        # Keep clean view columns
+        cols_to_show = [
+            "incident_id",
+            "source_type",
+            "disaster_type",
+            "severity",
+            "people_trapped",
+            "location",
+            "priority_score",
+            "status",
+            "created_at",
+        ]
+        df_clean = df[cols_to_show].copy()
+
+        # Rename columns to match translations
+        df_clean.columns = [
+            t.get("table.id", "ID"),
+            t.get("table.type", "Type"),
+            "Disaster",
+            t.get("table.severity", "Severity"),
+            t.get("table.trapped", "Trapped"),
+            t.get("table.location", "Location"),
+            t.get("table.priority", "Priority"),
+            t.get("table.status", "Status"),
+            "Timestamp",
+        ]
+
+        st.dataframe(df_clean, use_container_width=True)
+
+        # Actions & Exports Row
+        st.markdown("### ⚙️ Actions & Exports")
+
+        exp_col1, exp_col2, del_col = st.columns([1, 1, 2])
+
+        with exp_col1:
+            # Export JSON
+            json_str = json.dumps(incidents, indent=2)
+            st.download_button(
+                label=f"📥 {t.get('dash.exportJson', 'Export JSON')}",
+                data=json_str,
+                file_name="incidents_export.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+        with exp_col2:
+            # Export CSV
+            csv_data = df.to_csv(index=False)
+            st.download_button(
+                label=f"📥 {t.get('dash.exportCsv', 'Export CSV')}",
+                data=csv_data,
+                file_name="incidents_export.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+        with del_col:
+            # Delete selection
+            del_id = st.selectbox(
+                "Delete Incident ID",
+                options=[r["incident_id"] for r in incidents],
+                format_func=lambda x: f"Incident ID: {x}",
+            )
+            if st.button(
+                "🗑️ Delete Selected Incident",
+                type="secondary",
+                use_container_width=True,
+            ):
+                db.delete_incident(del_id)
+                st.success(f"Deleted Incident ID {del_id} successfully.")
+                st.rerun()
