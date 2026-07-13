@@ -5,7 +5,10 @@ and that a sample extraction produces schema-valid output structure
 (without requiring Ollama to be running, using a mock response).
 """
 
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from jsonschema import Draft7Validator
 

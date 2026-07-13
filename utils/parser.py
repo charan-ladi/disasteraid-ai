@@ -18,6 +18,7 @@ import json
 
 try:
     import requests
+
     _REQUESTS_AVAILABLE = True
 except Exception:
     _REQUESTS_AVAILABLE = False
@@ -26,8 +27,8 @@ except Exception:
 # Optional local LLM (Ollama) integration
 # ---------------------------------------------------------------------------
 OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "phi3:mini"          # or "tinyllama"
-OLLAMA_TIMEOUT = 4                  # seconds - fail fast, fall back to rules
+OLLAMA_MODEL = "phi3:mini"  # or "tinyllama"
+OLLAMA_TIMEOUT = 4  # seconds - fail fast, fall back to rules
 
 LLM_PROMPT_TEMPLATE = """You are an offline disaster-report extraction engine.
 Read the report below and return ONLY a single valid JSON object (no prose,
@@ -45,7 +46,14 @@ JSON:"""
 
 
 DISASTER_KEYWORDS = {
-    "Flood": ["flood", "water level", "rising water", "submerged", "waterlogged", "inundat"],
+    "Flood": [
+        "flood",
+        "water level",
+        "rising water",
+        "submerged",
+        "waterlogged",
+        "inundat",
+    ],
     "Earthquake": ["earthquake", "tremor", "collapsed building", "aftershock", "quake"],
     "Cyclone": ["cyclone", "hurricane", "storm surge", "high wind", "typhoon"],
     "Landslide": ["landslide", "mudslide", "slope collapse", "debris flow"],
@@ -53,16 +61,37 @@ DISASTER_KEYWORDS = {
 }
 
 SEVERITY_KEYWORDS = {
-    "Critical": ["immediate", "critical", "dying", "trapped", "drowning", "unconscious", "life-threatening", "urgent"],
+    "Critical": [
+        "immediate",
+        "critical",
+        "dying",
+        "trapped",
+        "drowning",
+        "unconscious",
+        "life-threatening",
+        "urgent",
+    ],
     "High": ["severe", "serious", "rapidly rising", "many people", "injured"],
     "Moderate": ["moderate", "some damage", "minor injuries"],
     "Low": ["minor", "stable", "under control"],
 }
 
 NUMBER_WORDS = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-    "a": 1, "single": 1, "couple": 2, "few": 3, "several": 5,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "a": 1,
+    "single": 1,
+    "couple": 2,
+    "few": 3,
+    "several": 5,
 }
 
 
@@ -80,7 +109,7 @@ def _find_count_near(text, keywords, window=6):
         kw_tokens = kw.split()
         kw_len = len(kw_tokens)
         for i in range(len(words) - kw_len + 1):
-            if words[i:i + kw_len] == kw_tokens:
+            if words[i : i + kw_len] == kw_tokens:
                 lo, hi = max(0, i - window), min(len(words), i + kw_len + window)
                 for j in list(range(i - 1, lo - 1, -1)) + list(range(i + kw_len, hi)):
                     n = _word_to_number(words[j])
@@ -109,7 +138,9 @@ def _detect_severity(text):
 
 def _detect_location(text):
     # Looks for "near <place>", "at <place>", "in <place>"
-    m = re.search(r"\b(?:near|at|in)\s+(?:the\s+)?([A-Za-z][A-Za-z\s]{2,40}?)(?:[.,]|$)", text)
+    m = re.search(
+        r"\b(?:near|at|in)\s+(?:the\s+)?([A-Za-z][A-Za-z\s]{2,40}?)(?:[.,]|$)", text
+    )
     if m:
         return m.group(1).strip().title()
     return "Unknown"
@@ -128,6 +159,13 @@ def _priority_score(severity, people_trapped, medical_help, injuries):
     return min(base, 100)
 
 
+def clean_text(text: str) -> str:
+    """Normalize whitespace and newlines."""
+    if not text:
+        return ""
+    return " ".join(text.split())
+
+
 def rule_based_parse(text):
     """Deterministic, offline, no-dependency extraction. Always works."""
     disaster_type = _detect_disaster_type(text)
@@ -136,9 +174,13 @@ def rule_based_parse(text):
     children = _find_count_near(text, ["child", "children", "kids"])
     elderly = _find_count_near(text, ["elderly", "old", "aged"])
     injuries = _yes_no(text, ["injur", "wound", "hurt", "bleeding"])
-    medical_help = _yes_no(text, ["medical", "ambulance", "doctor", "first aid", "hospital"])
+    medical_help = _yes_no(
+        text, ["medical", "ambulance", "doctor", "first aid", "hospital"]
+    )
     food_needed = _yes_no(text, ["food", "hungry", "ration", "starving"])
-    water_needed = _yes_no(text, ["no water", "drinking water", "water shortage", "need water", "thirsty"])
+    water_needed = _yes_no(
+        text, ["no water", "drinking water", "water shortage", "need water", "thirsty"]
+    )
     location = _detect_location(text)
     priority = _priority_score(severity, people_trapped, medical_help, injuries)
 
@@ -154,9 +196,11 @@ def rule_based_parse(text):
         "location": location,
         "severity": severity,
         "priority_score": priority,
-        "status": "Immediate Rescue" if priority >= 75 else
-                  "Urgent" if priority >= 50 else
-                  "Monitor",
+        "status": (
+            "Immediate Rescue"
+            if priority >= 75
+            else "Urgent" if priority >= 50 else "Monitor"
+        ),
         "engine": "rule_based",
     }
 
@@ -168,7 +212,12 @@ def llm_parse(text):
     prompt = LLM_PROMPT_TEMPLATE.format(text=text.strip())
     resp = requests.post(
         OLLAMA_URL,
-        json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"},
+        json={
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",
+        },
         timeout=OLLAMA_TIMEOUT,
     )
     resp.raise_for_status()
@@ -180,7 +229,11 @@ def llm_parse(text):
     data["engine"] = "local_llm:" + OLLAMA_MODEL
     if "status" not in data:
         score = data.get("priority_score", 50)
-        data["status"] = "Immediate Rescue" if score >= 75 else "Urgent" if score >= 50 else "Monitor"
+        data["status"] = (
+            "Immediate Rescue"
+            if score >= 75
+            else "Urgent" if score >= 50 else "Monitor"
+        )
     return data
 
 
@@ -193,6 +246,8 @@ def parse_text(text, prefer_llm=False):
     if not text or not text.strip():
         raise ValueError("Empty text supplied to parse_text()")
 
+    text = clean_text(text)
+
     if prefer_llm:
         try:
             return llm_parse(text)
@@ -203,7 +258,9 @@ def parse_text(text, prefer_llm=False):
 
 
 if __name__ == "__main__":
-    sample = ("Four people are trapped on the terrace near the old bridge. "
-              "Water level is rising rapidly. One elderly person requires "
-              "immediate medical assistance.")
+    sample = (
+        "Four people are trapped on the terrace near the old bridge. "
+        "Water level is rising rapidly. One elderly person requires "
+        "immediate medical assistance."
+    )
     print(json.dumps(parse_text(sample, prefer_llm=False), indent=2))

@@ -9,7 +9,9 @@ import json
 import os
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "disasteraid.db")
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "disasteraid.db"
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS incidents (
@@ -86,15 +88,30 @@ def save_incident(record, source_type="text", source_file=None, raw_text=None):
 
 
 def get_all_incidents(order_by="priority_score DESC"):
+    allowed_orders = {
+        "priority_score DESC",
+        "priority_score ASC",
+        "created_at DESC",
+        "created_at ASC",
+        "incident_id DESC",
+        "incident_id ASC",
+    }
+    if order_by not in allowed_orders:
+        order_by = "priority_score DESC"
+
     conn = get_connection()
-    rows = conn.execute(f"SELECT * FROM incidents ORDER BY {order_by}").fetchall()
+    query = f"SELECT * FROM incidents ORDER BY {order_by}"  # nosec B608
+    rows = conn.execute(query).fetchall()  # nosec B608
+
     conn.close()
     return [dict(r) for r in rows]
 
 
 def get_incident(incident_id):
     conn = get_connection()
-    row = conn.execute("SELECT * FROM incidents WHERE incident_id = ?", (incident_id,)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM incidents WHERE incident_id = ?", (incident_id,)
+    ).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -115,6 +132,7 @@ def export_json(path):
 
 def export_csv(path):
     import csv
+
     incidents = get_all_incidents()
     if not incidents:
         with open(path, "w") as f:

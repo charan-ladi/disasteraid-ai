@@ -28,6 +28,7 @@ _PADDLE_AVAILABLE = False
 
 try:
     from paddleocr import PaddleOCR  # noqa: F401
+
     _PADDLE_AVAILABLE = True
 except Exception:
     _PADDLE_AVAILABLE = False
@@ -35,6 +36,7 @@ except Exception:
 try:
     from PIL import Image
     import numpy as np
+
     _VISION_LIBS_AVAILABLE = True
 except Exception:
     _VISION_LIBS_AVAILABLE = False
@@ -44,6 +46,7 @@ def _get_engine():
     global _ocr_engine
     if _ocr_engine is None and _PADDLE_AVAILABLE:
         from paddleocr import PaddleOCR
+
         _ocr_engine = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
     return _ocr_engine
 
@@ -75,11 +78,16 @@ def _analyze_pixels(image_path):
     width, height = img.size
 
     return {
-        "mean_r": round(mean_r, 1), "mean_g": round(mean_g, 1), "mean_b": round(mean_b, 1),
-        "brightness": round(brightness, 1), "contrast": round(contrast, 1),
-        "blue_ratio": round(blue_ratio, 3), "red_ratio": round(red_ratio, 3),
+        "mean_r": round(mean_r, 1),
+        "mean_g": round(mean_g, 1),
+        "mean_b": round(mean_b, 1),
+        "brightness": round(brightness, 1),
+        "contrast": round(contrast, 1),
+        "blue_ratio": round(blue_ratio, 3),
+        "red_ratio": round(red_ratio, 3),
         "green_ratio": round(green_ratio, 3),
-        "width": width, "height": height,
+        "width": width,
+        "height": height,
     }
 
 
@@ -148,15 +156,21 @@ def _lite_vision_extract(image_path):
     file itself cannot be opened/decoded.
     """
     if not _VISION_LIBS_AVAILABLE:
-        return ("Image received but could not be analyzed: Pillow/numpy not "
-                "installed. Install requirements.txt to enable Lite Vision "
-                "analysis, or install paddleocr for full text-reading OCR.")
+        return (
+            "Image received but could not be analyzed: Pillow/numpy not "
+            "installed. Install requirements.txt to enable Lite Vision "
+            "analysis, or install paddleocr for full text-reading OCR."
+        )
 
     try:
         stats = _analyze_pixels(image_path)
-        disaster_type, severity, people_trapped, description = _classify_from_pixels(stats)
-        return (f"{disaster_type.upper()} INDICATORS DETECTED ({severity}): {description} "
-                f"Image size {stats['width']}x{stats['height']}.")
+        disaster_type, severity, people_trapped, description = _classify_from_pixels(
+            stats
+        )
+        return (
+            f"{disaster_type.upper()} INDICATORS DETECTED ({severity}): {description} "
+            f"Image size {stats['width']}x{stats['height']}."
+        )
     except Exception as exc:
         return f"Image received but could not be decoded for analysis ({exc})."
 
@@ -186,7 +200,11 @@ def extract_text_from_image(image_path):
         except Exception:
             pass  # fall through to lite vision
 
-    return {"text": _lite_vision_extract(image_path), "engine": "lite_vision_heuristic", "mock": True}
+    return {
+        "text": _lite_vision_extract(image_path),
+        "engine": "lite_vision_heuristic",
+        "mock": True,
+    }
 
 
 if __name__ == "__main__":

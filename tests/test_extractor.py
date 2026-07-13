@@ -1,7 +1,9 @@
 """Unit tests for utils/extractor.py schema validation logic."""
 
 import pytest
+from unittest.mock import MagicMock
 from jsonschema import Draft7Validator
+
 
 from utils.extractor import OUTPUT_SCHEMA, _extract_json_block
 
@@ -40,3 +42,51 @@ def test_sample_record_matches_schema():
     validator = Draft7Validator(OUTPUT_SCHEMA)
     errors = list(validator.iter_errors(sample))
     assert errors == []
+
+
+def test_extract_structured_data_success():
+    import ollama
+    from utils.extractor import extract_structured_data
+
+    ollama.generate = MagicMock(
+        return_value={
+            "response": '{"disaster_type": "Flood", "severity": "High", "priority_score": 80}'
+        }
+    )
+    res = extract_structured_data("some report text")
+    assert res["disaster_type"] == "Flood"
+    assert res["status"] == "ok"
+
+
+def test_extract_structured_data_json_error():
+    import ollama
+    from utils.extractor import extract_structured_data
+
+    ollama.generate = MagicMock(
+        side_effect=[
+            {"response": "invalid json"},
+            {
+                "response": '{"disaster_type": "Flood", "severity": "High", "priority_score": 80}'
+            },
+        ]
+    )
+    res = extract_structured_data("some report text")
+    assert res["disaster_type"] == "Flood"
+
+
+def test_extract_structured_data_persistent_error():
+    import ollama
+    from utils.extractor import extract_structured_data
+
+    ollama.generate = MagicMock(return_value={"response": "invalid json"})
+    res = extract_structured_data("some report text")
+    assert res["status"] == "extraction_failed"
+
+
+def test_extract_structured_data_model_missing():
+    import ollama
+    from utils.extractor import extract_structured_data
+
+    ollama.generate = MagicMock(side_effect=RuntimeError("Connection refused"))
+    res = extract_structured_data("some report text")
+    assert res["status"] == "model_missing"

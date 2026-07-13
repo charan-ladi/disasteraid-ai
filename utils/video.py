@@ -25,6 +25,7 @@ from . import speech as speech_module
 _CV2_AVAILABLE = False
 try:
     import cv2  # noqa: F401
+
     _CV2_AVAILABLE = True
 except Exception:
     _CV2_AVAILABLE = False
@@ -61,11 +62,26 @@ def _extract_frames(video_path, max_frames=5):
 def _extract_audio(video_path):
     """Use ffmpeg to pull a .wav audio track out of the video, if ffmpeg exists."""
     try:
-        out_path = tempfile.mktemp(suffix=".wav")
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            out_path = f.name
         subprocess.run(
-            ["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le",
-             "-ar", "16000", "-ac", "1", out_path],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                video_path,
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                out_path,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
         )
         return out_path
     except Exception:

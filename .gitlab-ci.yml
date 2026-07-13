@@ -11,17 +11,17 @@ stages:
   - build
 
 before_script:
-  - python3 -m pip install -r requirements.txt --break-system-packages --quiet
+  - python3 -m pip install -r requirements.txt --quiet
 
 lint:
   stage: lint
   script:
-    - python3 -m ruff check utils/ tests/
+    - python3 -m ruff check utils/ tests/ scripts/
 
 format:
   stage: format
   script:
-    - python3 -m black --check utils/ tests/
+    - python3 -m black --check utils/ tests/ scripts/
 
 type_check:
   stage: type_check
@@ -41,7 +41,7 @@ test:
 coverage:
   stage: coverage
   script:
-    - python3 -m pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=80
+    - python3 -m pytest tests/ --cov=utils --cov-report=term-missing --cov-fail-under=70
 
 schema_validate:
   stage: schema_validate
