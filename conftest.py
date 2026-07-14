@@ -8,21 +8,31 @@ from unittest.mock import MagicMock
 
 # Mock faster-whisper
 mock_whisper = MagicMock()
+
+
 class MockWhisperModel:
     def __init__(self, *args, **kwargs):
         pass
+
     def transcribe(self, *args, **kwargs):
         return [], None
+
+
 mock_whisper.WhisperModel = MockWhisperModel
 sys.modules["faster_whisper"] = mock_whisper
 
 # Mock paddleocr
 mock_paddleocr = MagicMock()
+
+
 class MockPaddleOCR:
     def __init__(self, *args, **kwargs):
         pass
+
     def ocr(self, *args, **kwargs):
         return []
+
+
 mock_paddleocr.PaddleOCR = MockPaddleOCR
 sys.modules["paddleocr"] = mock_paddleocr
 

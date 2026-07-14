@@ -5,7 +5,6 @@ SQLite persistence layer for DisasterAid AI.
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Any
 
 DB_PATH = "data/disasteraid.db"
@@ -92,7 +91,9 @@ def insert_incident(data: dict[str, Any]) -> int:
         return cursor.lastrowid
 
 
-def insert_report(incident_id: int, source_type: str, filename: str, extracted_text: str) -> int:
+def insert_report(
+    incident_id: int, source_type: str, filename: str, extracted_text: str
+) -> int:
     """Insert a raw report record linked to an incident."""
     with get_connection() as conn:
         cursor = conn.execute(
