@@ -21,9 +21,15 @@ def check_import(module_name: str) -> bool:
 
 
 def main() -> int:
-    required_modules = ["ollama", "whisper", "fitz", "cv2"]
+    required_modules = ["ollama", "fitz", "cv2"]
     for m in required_modules:
         check_import(m)
+    
+    # Whisper check is optional (either faster_whisper or whisper)
+    has_whisper = check_import("faster_whisper") or check_import("whisper")
+    if not has_whisper:
+        print("⚠️ Neither faster_whisper nor whisper is importable (mock mode will be used).")
+        
     print("✅ Checked all optional/required model runtime imports.")
     return 0
 
